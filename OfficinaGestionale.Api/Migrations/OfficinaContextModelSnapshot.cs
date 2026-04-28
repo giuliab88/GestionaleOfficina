@@ -1,0 +1,505 @@
+﻿using System;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using OfficinaGestionale.Api.Context;
+
+#nullable disable
+
+namespace OfficinaGestionale.Api.Migrations
+{
+    [DbContext(typeof(OfficinaContext))]
+    partial class OfficinaContextModelSnapshot : ModelSnapshot
+    {
+        protected override void BuildModel(ModelBuilder modelBuilder)
+        {
+#pragma warning disable 612, 618
+            modelBuilder
+                .HasAnnotation("ProductVersion", "8.0.8")
+                .HasAnnotation("Relational:MaxIdentifierLength", 128);
+
+            SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+
+            modelBuilder.Entity("OfficinaGestionale.Api.Models.Cliente", b =>
+                {
+                    b.Property<int>("ClienteId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ClienteId"));
+
+                    b.Property<string>("Codice")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("CodiceFiscale")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Cognome")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("Indirizzo")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("PartitaIva")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Telefono")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.HasKey("ClienteId");
+
+                    b.HasIndex("Codice")
+                        .IsUnique();
+
+                    b.ToTable("Cliente", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            ClienteId = 1,
+                            Codice = "CLI2026-001",
+                            Cognome = "Rossi",
+                            Email = "mario.rossi@example.com",
+                            Indirizzo = "Via Roma 1",
+                            Nome = "Mario",
+                            Telefono = "3331234567"
+                        },
+                        new
+                        {
+                            ClienteId = 2,
+                            Codice = "CLI2026-002",
+                            Cognome = "Bianchi",
+                            Email = "luca.bianchi@example.com",
+                            Indirizzo = "Via Milano 20",
+                            Nome = "Luca",
+                            Telefono = "3337654321"
+                        });
+                });
+
+            modelBuilder.Entity("OfficinaGestionale.Api.Models.Fattura", b =>
+                {
+                    b.Property<int>("FatturaId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("FatturaId"));
+
+                    b.Property<decimal>("AliquotaIva")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("decimal(5,2)")
+                        .HasDefaultValue(22m);
+
+                    b.Property<string>("Codice")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<DateTime>("DataEmissione")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("DataScadenza")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ModalitaPagamento")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int?>("PreventivoRif")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Stato")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<int>("VeicoloRif")
+                        .HasColumnType("int");
+
+                    b.HasKey("FatturaId");
+
+                    b.HasIndex("Codice")
+                        .IsUnique();
+
+                    b.HasIndex("PreventivoRif");
+
+                    b.HasIndex("VeicoloRif");
+
+                    b.ToTable("Fattura", (string)null);
+                });
+
+            modelBuilder.Entity("OfficinaGestionale.Api.Models.Intervento", b =>
+                {
+                    b.Property<int>("InterventoId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("InterventoId"));
+
+                    b.Property<string>("Codice")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<DateTime>("DataIngresso")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("data_ingresso");
+
+                    b.Property<string>("Descrizione")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<decimal>("Prezzo")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<string>("Stato")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<int>("VeicoloRif")
+                        .HasColumnType("int");
+
+                    b.HasKey("InterventoId");
+
+                    b.HasIndex("Codice")
+                        .IsUnique();
+
+                    b.HasIndex("VeicoloRif");
+
+                    b.ToTable("Intervento", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            InterventoId = 1,
+                            Codice = "INT2026-001",
+                            DataIngresso = new DateTime(2026, 4, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Prezzo = 180.00m,
+                            Stato = "Aperto",
+                            VeicoloRif = 1
+                        });
+                });
+
+            modelBuilder.Entity("OfficinaGestionale.Api.Models.Preventivo", b =>
+                {
+                    b.Property<int>("PreventivoId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("PreventivoId"));
+
+                    b.Property<decimal>("AliquotaIva")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("decimal(5,2)")
+                        .HasDefaultValue(22m);
+
+                    b.Property<string>("Codice")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<DateTime>("Data")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Stato")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTime?>("ValidoFino")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("VeicoloRif")
+                        .HasColumnType("int");
+
+                    b.HasKey("PreventivoId");
+
+                    b.HasIndex("Codice")
+                        .IsUnique();
+
+                    b.HasIndex("VeicoloRif");
+
+                    b.ToTable("Preventivo", (string)null);
+                });
+
+            modelBuilder.Entity("OfficinaGestionale.Api.Models.RigaFattura", b =>
+                {
+                    b.Property<int>("RigaFatturaId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("RigaFatturaId"));
+
+                    b.Property<string>("Descrizione")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<int>("FatturaRif")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("PrezzoUnitario")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("Quantita")
+                        .HasColumnType("decimal(10,3)");
+
+                    b.HasKey("RigaFatturaId");
+
+                    b.HasIndex("FatturaRif");
+
+                    b.ToTable("RigaFattura", (string)null);
+                });
+
+            modelBuilder.Entity("OfficinaGestionale.Api.Models.Utente", b =>
+                {
+                    b.Property<int>("UtenteId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("UtenteId"));
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Ruolo")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.HasKey("UtenteId");
+
+                    b.HasIndex("Email")
+                        .IsUnique();
+
+                    b.ToTable("Utente", (string)null);
+                });
+
+            modelBuilder.Entity("OfficinaGestionale.Api.Models.Veicolo", b =>
+                {
+                    b.Property<int>("VeicoloId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("VeicoloId"));
+
+                    b.Property<int>("Anno")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ClienteRif")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Codice")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Marca")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Modello")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Targa")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("VeicoloId");
+
+                    b.HasIndex("ClienteRif");
+
+                    b.HasIndex("Targa")
+                        .IsUnique();
+
+                    b.ToTable("Veicolo", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            VeicoloId = 1,
+                            Anno = 2018,
+                            ClienteRif = 1,
+                            Codice = "VEI2026-001",
+                            Marca = "Fiat",
+                            Modello = "Panda",
+                            Targa = "DV552ER"
+                        },
+                        new
+                        {
+                            VeicoloId = 2,
+                            Anno = 2020,
+                            ClienteRif = 2,
+                            Codice = "VEI2026-002",
+                            Marca = "Volkswagen",
+                            Modello = "Golf",
+                            Targa = "EL920GY"
+                        });
+                });
+
+            modelBuilder.Entity("OfficinaGestionale.Api.Models.VocePreventivo", b =>
+                {
+                    b.Property<int>("VocePreventivoId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("VocePreventivoId"));
+
+                    b.Property<string>("Descrizione")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<int>("PreventivoRif")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("PrezzoUnitario")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("Quantita")
+                        .HasColumnType("decimal(10,3)");
+
+                    b.HasKey("VocePreventivoId");
+
+                    b.HasIndex("PreventivoRif");
+
+                    b.ToTable("VocePreventivo", (string)null);
+                });
+
+            modelBuilder.Entity("OfficinaGestionale.Api.Models.Fattura", b =>
+                {
+                    b.HasOne("OfficinaGestionale.Api.Models.Preventivo", "Preventivo")
+                        .WithMany()
+                        .HasForeignKey("PreventivoRif")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("OfficinaGestionale.Api.Models.Veicolo", "Veicolo")
+                        .WithMany()
+                        .HasForeignKey("VeicoloRif")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Preventivo");
+
+                    b.Navigation("Veicolo");
+                });
+
+            modelBuilder.Entity("OfficinaGestionale.Api.Models.Intervento", b =>
+                {
+                    b.HasOne("OfficinaGestionale.Api.Models.Veicolo", "Veicolo")
+                        .WithMany("Interventi")
+                        .HasForeignKey("VeicoloRif")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Veicolo");
+                });
+
+            modelBuilder.Entity("OfficinaGestionale.Api.Models.Preventivo", b =>
+                {
+                    b.HasOne("OfficinaGestionale.Api.Models.Veicolo", "Veicolo")
+                        .WithMany()
+                        .HasForeignKey("VeicoloRif")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Veicolo");
+                });
+
+            modelBuilder.Entity("OfficinaGestionale.Api.Models.RigaFattura", b =>
+                {
+                    b.HasOne("OfficinaGestionale.Api.Models.Fattura", "Fattura")
+                        .WithMany("Righe")
+                        .HasForeignKey("FatturaRif")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Fattura");
+                });
+
+            modelBuilder.Entity("OfficinaGestionale.Api.Models.Veicolo", b =>
+                {
+                    b.HasOne("OfficinaGestionale.Api.Models.Cliente", "Cliente")
+                        .WithMany("Veicoli")
+                        .HasForeignKey("ClienteRif")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Cliente");
+                });
+
+            modelBuilder.Entity("OfficinaGestionale.Api.Models.VocePreventivo", b =>
+                {
+                    b.HasOne("OfficinaGestionale.Api.Models.Preventivo", "Preventivo")
+                        .WithMany("Voci")
+                        .HasForeignKey("PreventivoRif")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Preventivo");
+                });
+
+            modelBuilder.Entity("OfficinaGestionale.Api.Models.Cliente", b =>
+                {
+                    b.Navigation("Veicoli");
+                });
+
+            modelBuilder.Entity("OfficinaGestionale.Api.Models.Fattura", b =>
+                {
+                    b.Navigation("Righe");
+                });
+
+            modelBuilder.Entity("OfficinaGestionale.Api.Models.Preventivo", b =>
+                {
+                    b.Navigation("Voci");
+                });
+
+            modelBuilder.Entity("OfficinaGestionale.Api.Models.Veicolo", b =>
+                {
+                    b.Navigation("Interventi");
+                });
+#pragma warning restore 612, 618
+        }
+    }
+}

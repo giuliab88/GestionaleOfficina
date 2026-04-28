@@ -1,0 +1,228 @@
+@page "/clienti"
+@attribute [Authorize]
+@inject ApiClient Api
+
+@if (_errore is not null)
+{
+    <div class="alert alert-danger">@_errore</div>
+}
+
+<div class="card">
+    <div class="card-head">
+        <span class="card-title">Clienti (@_filtrati.Count())</span>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <div class="search"><input class="fc" placeholder="Cerca…" @bind="_q" @bind:event="oninput" /></div>
+            <button class="btn btn-primary btn-sm" @onclick="ApriNuovo">+ Nuovo cliente</button>
+        </div>
+    </div>
+    <div class="tw">
+        <table>
+            <thead>
+                <tr><th>Codice</th><th>Nome</th><th>Telefono</th><th>Email</th><th>Indirizzo</th><th></th></tr>
+            </thead>
+            <tbody>
+                @if (!_filtrati.Any())
+                {
+                    <tr>
+                        <td colspan="6">
+                            <div class="empty-state">
+                                <div class="empty-icon"><i class="bi bi-people"></i></div>
+                                <p>Nessun cliente trovato.</p>
+                            </div>
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var c in _filtrati)
+                    {
+                        <tr>
+                            <td class="td-code">@c.Codice</td>
+                            <td><strong>@c.Cognome</strong> @c.Nome</td>
+                            <td class="td-m">@(c.Telefono ?? "—")</td>
+                            <td class="td-m">@(c.Email ?? "—")</td>
+                            <td class="td-m">@(c.Indirizzo ?? "—")</td>
+                            <td>
+                                <div class="td-act">
+                                    <button class="btn btn-secondary btn-sm" @onclick="() => ApriModifica(c)">
+                                        <i class="bi bi-pencil"></i> Modifica
+                                    </button>
+                                    <button class="btn btn-danger btn-sm" @onclick="() => ApriElimina(c)">
+                                        <i class="bi bi-trash"></i> Elimina
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@if (_modale)
+{
+    <div class="modal-backdrop">
+        <div class="modal">
+            <div class="modal-title">@(_isModifica ? $"Modifica — {_f.Codice}" : "Nuovo cliente")</div>
+
+            <div class="fr c2">
+                <div class="fg"><label class="fl">Nome *</label><input class="fc" @bind="_f.Nome" /></div>
+                <div class="fg"><label class="fl">Cognome *</label><input class="fc" @bind="_f.Cognome" /></div>
+            </div>
+
+            <div class="fg">
+                <label class="fl">Codice cliente</label>
+                <input class="fc" @bind="_f.Codice" placeholder="Lascia vuoto per generarlo" disabled="@_isModifica" />
+            </div>
+
+            <div class="fr c2">
+                <div class="fg"><label class="fl">Telefono</label><input class="fc" @bind="_f.Telefono" /></div>
+                <div class="fg"><label class="fl">Email</label><input class="fc" @bind="_f.Email" type="email" /></div>
+            </div>
+
+            <div class="fg"><label class="fl">Indirizzo</label><input class="fc" @bind="_f.Indirizzo" /></div>
+
+            <div class="fr c2">
+                <div class="fg">
+                    <label class="fl">Codice Fiscale</label>
+                    <input class="fc" @bind="_f.CodiceFiscale" placeholder="Es. RSSMRA80A01H501Z" style="text-transform:uppercase" />
+                </div>
+                <div class="fg">
+                    <label class="fl">Partita IVA</label>
+                    <input class="fc" @bind="_f.PartitaIva" placeholder="Es. 01234567890" />
+                </div>
+            </div>
+
+            @if (_erroreModale is not null)
+            {
+                <div class="alert alert-danger">@_erroreModale</div>
+            }
+
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="Chiudi">Annulla</button>
+                <button class="btn btn-primary" @onclick="Salva">Salva</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_confermaElimina)
+{
+    <div class="modal-backdrop">
+        <div class="modal">
+            <div class="modal-title">Elimina cliente</div>
+            <p>Sei sicuro di voler eliminare <strong>@_f.Cognome @_f.Nome</strong>?</p>
+            <p style="color:var(--muted);font-size:12.5px;margin-top:6px">
+                Il cliente non può essere eliminato se ha veicoli collegati.
+            </p>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="Chiudi">Annulla</button>
+                <button class="btn btn-danger" @onclick="Elimina">Elimina</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    List<ClienteDto> _lista = new();
+    ClienteDto _f = new();
+    string _q = "";
+    bool _modale, _isModifica, _confermaElimina;
+    string? _errore, _erroreModale;
+
+    // filtro lato client su più campi
+    IEnumerable<ClienteDto> _filtrati => string.IsNullOrWhiteSpace(_q) ? _lista
+        : _lista.Where(c =>
+            c.Codice.Contains(_q, StringComparison.OrdinalIgnoreCase) ||
+            c.Nome.Contains(_q, StringComparison.OrdinalIgnoreCase) ||
+            c.Cognome.Contains(_q, StringComparison.OrdinalIgnoreCase) ||
+            (c.Email ?? "").Contains(_q, StringComparison.OrdinalIgnoreCase) ||
+            (c.Telefono ?? "").Contains(_q, StringComparison.OrdinalIgnoreCase));
+
+    protected override Task OnInitializedAsync() => Carica();
+
+    async Task Carica()
+    {
+        try
+        {
+            _lista = await Api.GetClientiAsync();
+            _errore = null;
+        }
+        catch (Exception ex)
+        {
+            _errore = ex.Message;
+        }
+    }
+
+    void ApriNuovo()
+    {
+        _f = new();
+        _isModifica = false;
+        _erroreModale = null;
+        _modale = true;
+    }
+
+    // copio il cliente per evitare modifiche dirette alla lista
+    void ApriModifica(ClienteDto c)
+    {
+        _f = new()
+        {
+            Codice = c.Codice,
+            Nome = c.Nome,
+            Cognome = c.Cognome,
+            Telefono = c.Telefono,
+            Email = c.Email,
+            Indirizzo = c.Indirizzo
+        };
+        _isModifica = true;
+        _erroreModale = null;
+        _modale = true;
+    }
+
+    void ApriElimina(ClienteDto c)
+    {
+        _f = c;
+        _confermaElimina = true;
+    }
+
+    void Chiudi()
+    {
+        _modale = false;
+        _confermaElimina = false;
+        _erroreModale = null;
+    }
+
+    async Task Salva()
+    {
+        if (string.IsNullOrWhiteSpace(_f.Nome) || string.IsNullOrWhiteSpace(_f.Cognome))
+        {
+            _erroreModale = "Nome e cognome sono obbligatori.";
+            return;
+        }
+
+        bool ok = _isModifica
+            ? await Api.AggiornaClienteAsync(_f)
+            : await Api.InserisciClienteAsync(_f);
+
+        if (!ok)
+        {
+            _erroreModale = _isModifica ? "Aggiornamento non riuscito." : "Codice già in uso.";
+            return;
+        }
+
+        Chiudi();
+        await Carica();
+    }
+
+    async Task Elimina()
+    {
+        bool ok = await Api.EliminaClienteAsync(_f.Codice);
+
+        if (!ok)
+            _errore = "Eliminazione non riuscita. Il cliente ha veicoli collegati.";
+
+        _confermaElimina = false;
+        await Carica();
+    }
+}

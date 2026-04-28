@@ -1,0 +1,107 @@
+@page "/"
+@attribute [Authorize]
+@inject ApiClient Api
+
+@if (_errore is not null)
+{
+    <div class="alert alert-danger">@_errore</div>
+}
+
+<div class="stats">
+    <div class="stat a">
+        <div class="stat-l">Clienti</div>
+        <div class="stat-v">@_clienti</div>
+        <div class="stat-s">registrati</div>
+    </div>
+    <div class="stat b">
+        <div class="stat-l">Veicoli</div>
+        <div class="stat-v">@_veicoli</div>
+        <div class="stat-s">in archivio</div>
+    </div>
+    <div class="stat c">
+        <div class="stat-l">Aperti</div>
+        <div class="stat-v">@_aperti</div>
+        <div class="stat-s">interventi aperti</div>
+    </div>
+    <div class="stat d">
+        <div class="stat-l">In lavorazione</div>
+        <div class="stat-v">@_lavorazione</div>
+        <div class="stat-s">in corso</div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-head">
+        <span class="card-title">Ultimi interventi</span>
+    </div>
+    <div class="tw">
+        <table>
+            <thead>
+                <tr>
+                    <th>Codice</th>
+                    <th>Veicolo</th>
+                    <th>Data ingresso</th>
+                    <th>Prezzo</th>
+                    <th>Stato</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!_ultimi.Any())
+                {
+                    <tr><td colspan="5"><div class="empty-state"><div class="empty-icon"><i class="bi bi-wrench"></i></div><p>Nessun intervento registrato.</p></div></td></tr>
+                }
+                else
+                {
+                    @foreach (var i in _ultimi)
+                    {
+                        <tr>
+                            <td class="td-code">@i.Codice</td>
+                            <td>@(i.Veicolo is not null ? $"{i.Veicolo.Marca} {i.Veicolo.Modello} ({i.Veicolo.Targa})" : i.TargaVeicolo)</td>
+                            <td class="td-m">@i.DataIngresso.ToShortDateString()</td>
+                            <td style="font-weight:500">€ @i.Prezzo.ToString("N2")</td>
+                            <td><span class="badge @BadgeClass(i.Stato)">@i.Stato</span></td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    int _clienti, _veicoli, _aperti, _lavorazione;
+    List<InterventoDto> _ultimi = new();
+    string? _errore;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var clienti = await Api.GetClientiAsync();
+            var veicoli = await Api.GetVeicoliAsync();
+            var interventi = await Api.GetInterventiAsync();
+
+            _clienti = clienti.Count;
+            _veicoli = veicoli.Count;
+            _aperti = interventi.Count(i => i.Stato == StatoIntervento.Aperto);
+            _lavorazione = interventi.Count(i => i.Stato == StatoIntervento.InLavorazione);
+
+            // prendo gli ultimi 5 interventi per la dashboard
+            _ultimi = interventi.Take(5).ToList();
+        }
+        catch (Exception ex)
+        {
+            _errore = ex.Message;
+        }
+    }
+
+    // classe del badge in base allo stato intervento
+    string BadgeClass(StatoIntervento s) => s switch
+    {
+        StatoIntervento.Aperto => "badge-aperto",
+        StatoIntervento.InLavorazione => "badge-lavorazione",
+        StatoIntervento.Completato => "badge-completato",
+        StatoIntervento.Annullato => "badge-annullato",
+        _ => ""
+    };
+}

@@ -1,0 +1,293 @@
+@page "/fatture"
+@attribute [Authorize]
+@inject ApiClient Api
+
+@if (_errore is not null)
+{
+    <div class="alert alert-danger">@_errore</div>
+}
+
+<div class="card">
+    <div class="card-head">
+        <span class="card-title">Fatture (@_filtrati.Count())</span>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <div class="search"><input class="fc" placeholder="Cerca…" @bind="_q" @bind:event="oninput" /></div>
+            <select class="fc" style="width:auto" @bind="_filtroStato">
+                <option value="">Tutti gli stati</option>
+                @foreach (var s in Enum.GetValues<StatoFattura>())
+                {
+                    <option value="@s">@s</option>
+                }
+            </select>
+            <button class="btn btn-primary btn-sm" @onclick="ApriNuovo">+ Nuova fattura</button>
+        </div>
+    </div>
+    <div class="tw">
+        <table>
+            <thead>
+                <tr><th>Codice</th><th>Veicolo</th><th>Cliente</th><th>Data emissione</th><th>Scadenza</th><th>Totale</th><th>Stato</th><th>Da preventivo</th><th></th></tr>
+            </thead>
+            <tbody>
+                @if (!_filtrati.Any())
+                {
+                    <tr><td colspan="9"><div class="empty-state"><div class="empty-icon"><i class="bi bi-receipt"></i></div><p>Nessuna fattura trovata.</p></div></td></tr>
+                }
+                else
+                {
+                    @foreach (var f in _filtrati)
+                    {
+                        <tr>
+                            <td class="td-code">@f.Codice</td>
+                            <td>@(f.Veicolo is not null ? $"{f.Veicolo.Marca} {f.Veicolo.Modello} ({f.Veicolo.Targa})" : f.TargaVeicolo)</td>
+                            <td class="td-m">@(f.Veicolo is not null ? $"{f.Veicolo.CognomeCliente} {f.Veicolo.NomeCliente}" : "—")</td>
+                            <td class="td-m">@f.DataEmissione.ToShortDateString()</td>
+                            <td class="td-m">@(f.DataScadenza.HasValue ? f.DataScadenza.Value.ToShortDateString() : "—")</td>
+                            <td style="font-weight:500">€ @f.Totale.ToString("N2")</td>
+                            <td><span class="badge @BadgeClassFatt(f.Stato)">@f.Stato</span></td>
+                            <td class="td-m">@(f.CodicePreventivo is not null ? f.CodicePreventivo : "—")</td>
+                            <td>
+                                <div class="td-act">
+                                    <button class="btn btn-secondary btn-sm" @onclick="() => ApriModifica(f)"><i class="bi bi-pencil"></i> Modifica</button>
+                                    <button class="btn btn-danger btn-sm" @onclick="() => ApriElimina(f)"><i class="bi bi-trash"></i></button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@if (_modale)
+{
+    <div class="modal-backdrop">
+        <div class="modal" style="max-width:620px">
+            <div class="modal-title">@(_isModifica ? $"Modifica — {_f.Codice}" : "Nuova fattura")</div>
+
+            <div class="fr c2">
+                <div class="fg"><label class="fl">Codice</label><input class="fc" @bind="_f.Codice" disabled="@_isModifica" placeholder="Auto-generato se vuoto" /></div>
+                <div class="fg">
+                    <label class="fl">Stato</label>
+                    <select class="fc" @bind="_f.Stato">
+                        @foreach (var s in Enum.GetValues<StatoFattura>())
+                        {
+                            <option value="@s">@s</option>
+                        }
+                    </select>
+                </div>
+            </div>
+            <div class="fr c2">
+                <div class="fg"><label class="fl">Data emissione</label><input class="fc" @bind="_f.DataEmissione" type="date" /></div>
+                <div class="fg"><label class="fl">Data scadenza pagamento</label><input class="fc" @bind="_f.DataScadenza" type="date" /></div>
+            </div>
+            <div class="fr c2">
+                <div class="fg">
+                    <label class="fl">Aliquota IVA</label>
+                    <select class="fc" @bind="_f.AliquotaIva">
+                        <option value="0">0% — Esente IVA</option>
+                        <option value="4">4% — Beni prima necessità</option>
+                        <option value="5">5%</option>
+                        <option value="10">10% — Ridotta</option>
+                        <option value="22">22% — Ordinaria</option>
+                    </select>
+                </div>
+                <div class="fg">
+                    <label class="fl">Modalità pagamento</label>
+                    <select class="fc" @bind="_f.ModalitaPagamento">
+                        <option value="">— Non specificata —</option>
+                        <option value="Bonifico bancario">Bonifico bancario</option>
+                        <option value="Contanti">Contanti</option>
+                        <option value="Carta di credito/debito">Carta di credito/debito</option>
+                        <option value="Assegno">Assegno</option>
+                        <option value="RID/SDD">RID/SDD</option>
+                    </select>
+                </div>
+            </div>
+            <div class="fr c2">
+                <div class="fg">
+                    <label class="fl">Veicolo *</label>
+                    <select class="fc" @bind="_f.TargaVeicolo">
+                        <option value="">— Seleziona veicolo —</option>
+                        @foreach (var v in _veicoli)
+                        {
+                            <option value="@v.Targa">@v.Targa — @v.Marca @v.Modello (@v.CodiceCliente)</option>
+                        }
+                    </select>
+                </div>
+                <div class="fg">
+                    <label class="fl">Da preventivo</label>
+                    <select class="fc" @bind="_f.CodicePreventivo">
+                        <option value="">— Nessuno —</option>
+                        @foreach (var p in _preventivi)
+                        {
+                            <option value="@p.Codice">@p.Codice — @p.TargaVeicolo (€ @p.Totale.ToString("N2"))</option>
+                        }
+                    </select>
+                </div>
+            </div>
+            <div class="fg"><label class="fl">Note</label><textarea class="fc" @bind="_f.Note" rows="2" placeholder="Note aggiuntive…"></textarea></div>
+
+            <div style="margin-bottom:10px">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                    <span class="fl" style="margin:0">Righe</span>
+                    <button class="btn btn-secondary btn-sm" type="button" @onclick="AggiungiRiga"><i class="bi bi-plus"></i> Aggiungi riga</button>
+                </div>
+                @if (_f.Righe.Count == 0)
+                {
+                    <p style="font-size:12px;color:var(--muted);text-align:center;padding:10px 0">Nessuna riga. Clicca "Aggiungi riga" per iniziare.</p>
+                }
+                else
+                {
+                    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);display:grid;grid-template-columns:1fr 80px 100px 80px 28px;gap:6px;margin-bottom:4px;padding:0 2px">
+                        <span>Descrizione</span><span>Qtà</span><span>Prezzo unit.</span><span style="text-align:right">Totale</span><span></span>
+                    </div>
+                    @foreach (var r in _f.Righe)
+                    {
+                        <div style="display:grid;grid-template-columns:1fr 80px 100px 80px 28px;gap:6px;margin-bottom:6px;align-items:center">
+                            <input class="fc" @bind="r.Descrizione" placeholder="Es. Manodopera" />
+                            <input class="fc" @bind="r.Quantita" type="number" min="0.01" step="0.01" />
+                            <input class="fc" @bind="r.PrezzoUnitario" type="number" min="0" step="0.01" />
+                            <span style="text-align:right;font-weight:500;font-size:13px">€ @r.Totale.ToString("N2")</span>
+                            <button type="button" class="btn btn-danger btn-sm" style="padding:4px 7px" @onclick="() => RimuoviRiga(r)"><i class="bi bi-x"></i></button>
+                        </div>
+                    }
+                    <div style="text-align:right;font-size:13px;padding-top:6px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:3px">
+                        <span>Imponibile: € @_f.Imponibile.ToString("N2")</span>
+                        <span>IVA @_f.AliquotaIva%: € @_f.ImportoIva.ToString("N2")</span>
+                        <span style="font-weight:700;font-size:14px;margin-top:2px">Totale: € @_f.Totale.ToString("N2")</span>
+                    </div>
+                }
+            </div>
+
+            @if (_erroreModale is not null)
+            {
+                <div class="alert alert-danger">@_erroreModale</div>
+            }
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="Chiudi">Annulla</button>
+                <button class="btn btn-primary" @onclick="Salva">Salva</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_confermaElimina)
+{
+    <div class="modal-backdrop">
+        <div class="modal">
+            <div class="modal-title">Elimina fattura</div>
+            <p>Sei sicuro di voler eliminare la fattura <strong>@_f.Codice</strong>?</p>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="Chiudi">Annulla</button>
+                <button class="btn btn-danger" @onclick="Elimina">Elimina</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    List<FatturaDto> _lista = new();
+    List<VeicoloDto> _veicoli = new();
+    List<PreventivoDto> _preventivi = new();
+    FatturaDto _f = new();
+    string _q = "", _filtroStato = "";
+    bool _modale, _isModifica, _confermaElimina;
+    string? _errore, _erroreModale;
+
+    // filtro per testo e stato
+    IEnumerable<FatturaDto> _filtrati
+    {
+        get
+        {
+            var r = _lista.AsEnumerable();
+            if (!string.IsNullOrWhiteSpace(_q))
+                r = r.Where(f => f.Codice.Contains(_q, StringComparison.OrdinalIgnoreCase) ||
+                                 f.TargaVeicolo.Contains(_q, StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrWhiteSpace(_filtroStato) && Enum.TryParse<StatoFattura>(_filtroStato, out var stato))
+                r = r.Where(f => f.Stato == stato);
+            return r;
+        }
+    }
+
+    protected override Task OnInitializedAsync() => Carica();
+
+    async Task Carica()
+    {
+        try
+        {
+            _lista = await Api.GetFattureAsync();
+            _veicoli = await Api.GetVeicoliAsync();
+            _preventivi = await Api.GetPreventiviAsync();
+            _errore = null;
+        }
+        catch (Exception ex) { _errore = ex.Message; }
+    }
+
+    void ApriNuovo()
+    {
+        _f = new() { DataEmissione = DateTime.Today, Stato = StatoFattura.Emessa };
+        _isModifica = false; _erroreModale = null; _modale = true;
+    }
+
+    // copio la fattura per non modificare direttamente la lista
+    void ApriModifica(FatturaDto f)
+    {
+        _f = new()
+        {
+            Codice = f.Codice,
+            DataEmissione = f.DataEmissione,
+            DataScadenza = f.DataScadenza,
+            Note = f.Note,
+            Stato = f.Stato,
+            AliquotaIva = f.AliquotaIva,
+            ModalitaPagamento = f.ModalitaPagamento,
+            TargaVeicolo = f.TargaVeicolo,
+            CodicePreventivo = f.CodicePreventivo,
+            Righe = f.Righe.Select(r => new RigaFatturaDto
+            {
+                RigaFatturaId = r.RigaFatturaId,
+                Descrizione = r.Descrizione,
+                Quantita = r.Quantita,
+                PrezzoUnitario = r.PrezzoUnitario
+            }).ToList()
+        };
+        _isModifica = true; _erroreModale = null; _modale = true;
+    }
+
+    void ApriElimina(FatturaDto f) { _f = f; _confermaElimina = true; }
+    void Chiudi() { _modale = false; _confermaElimina = false; _erroreModale = null; }
+
+    void AggiungiRiga() => _f.Righe.Add(new RigaFatturaDto { Quantita = 1 });
+    void RimuoviRiga(RigaFatturaDto r) => _f.Righe.Remove(r);
+
+    async Task Salva()
+    {
+        if (string.IsNullOrWhiteSpace(_f.TargaVeicolo))
+        { _erroreModale = "Il veicolo è obbligatorio."; return; }
+        if (_f.Righe.Any(r => string.IsNullOrWhiteSpace(r.Descrizione)))
+        { _erroreModale = "Tutte le righe devono avere una descrizione."; return; }
+
+        bool ok = _isModifica
+            ? await Api.AggiornaFatturaAsync(_f)
+            : await Api.InserisciFatturaAsync(_f);
+        if (!ok) { _erroreModale = _isModifica ? "Aggiornamento non riuscito." : "Inserimento non riuscito."; return; }
+        Chiudi(); await Carica();
+    }
+
+    async Task Elimina()
+    {
+        bool ok = await Api.EliminaFatturaAsync(_f.Codice);
+        if (!ok) _errore = "Eliminazione non riuscita.";
+        _confermaElimina = false; await Carica();
+    }
+
+    // classe del badge in base allo stato fattura
+    string BadgeClassFatt(StatoFattura s) => s switch
+    {
+        StatoFattura.Emessa => "badge-emessa",
+        StatoFattura.Pagata => "badge-completato",
+        StatoFattura.Annullata => "badge-annullato",
+        _ => ""
+    };
+}

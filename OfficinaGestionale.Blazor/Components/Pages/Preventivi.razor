@@ -1,0 +1,299 @@
+@page "/preventivi"
+@attribute [Authorize]
+@inject ApiClient Api
+
+@if (_errore is not null)
+{
+    <div class="alert alert-danger">@_errore</div>
+}
+@if (_successo is not null)
+{
+    <div class="alert alert-success">@_successo</div>
+}
+
+<div class="card">
+    <div class="card-head">
+        <span class="card-title">Preventivi (@_filtrati.Count())</span>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <div class="search"><input class="fc" placeholder="Cerca…" @bind="_q" @bind:event="oninput" /></div>
+            <select class="fc" style="width:auto" @bind="_filtroStato">
+                <option value="">Tutti gli stati</option>
+                @foreach (var s in Enum.GetValues<StatoPreventivo>())
+                {
+                    <option value="@s">@s</option>
+                }
+            </select>
+            <button class="btn btn-primary btn-sm" @onclick="ApriNuovo">+ Nuovo preventivo</button>
+        </div>
+    </div>
+    <div class="tw">
+        <table>
+            <thead>
+                <tr><th>Codice</th><th>Veicolo</th><th>Cliente</th><th>Data</th><th>Totale</th><th>Stato</th><th>Voci</th><th></th></tr>
+            </thead>
+            <tbody>
+                @if (!_filtrati.Any())
+                {
+                    <tr><td colspan="8"><div class="empty-state"><div class="empty-icon"><i class="bi bi-file-earmark-text"></i></div><p>Nessun preventivo trovato.</p></div></td></tr>
+                }
+                else
+                {
+                    @foreach (var p in _filtrati)
+                    {
+                        <tr>
+                            <td class="td-code">@p.Codice</td>
+                            <td>@(p.Veicolo is not null ? $"{p.Veicolo.Marca} {p.Veicolo.Modello} ({p.Veicolo.Targa})" : p.TargaVeicolo)</td>
+                            <td class="td-m">@(p.Veicolo?.CodiceCliente ?? "—")</td>
+                            <td class="td-m">@p.Data.ToShortDateString()</td>
+                            <td style="font-weight:500">€ @p.Totale.ToString("N2")</td>
+                            <td><span class="badge @BadgeClassPrev(p.Stato)">@p.Stato</span></td>
+                            <td class="td-m">@p.Voci.Count voc@(p.Voci.Count == 1 ? "e" : "i")</td>
+                            <td>
+                                <div class="td-act">
+                                    <button class="btn btn-secondary btn-sm" @onclick="() => ApriModifica(p)"><i class="bi bi-pencil"></i> Modifica</button>
+                                    <button class="btn btn-primary btn-sm" title="Converti in fattura" @onclick="() => ApriConverti(p)"><i class="bi bi-receipt"></i></button>
+                                    <button class="btn btn-danger btn-sm" @onclick="() => ApriElimina(p)"><i class="bi bi-trash"></i></button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@if (_modale)
+{
+    <div class="modal-backdrop">
+        <div class="modal" style="max-width:600px">
+            <div class="modal-title">@(_isModifica ? $"Modifica — {_f.Codice}" : "Nuovo preventivo")</div>
+
+            <div class="fr c2">
+                <div class="fg"><label class="fl">Codice</label><input class="fc" @bind="_f.Codice" disabled="@_isModifica" placeholder="Auto-generato se vuoto" /></div>
+                <div class="fg"><label class="fl">Data</label><input class="fc" @bind="_f.Data" type="date" /></div>
+            </div>
+            <div class="fr c2">
+                <div class="fg"><label class="fl">Valido fino al</label><input class="fc" @bind="_f.ValidoFino" type="date" /></div>
+                <div class="fg">
+                    <label class="fl">Aliquota IVA</label>
+                    <select class="fc" @bind="_f.AliquotaIva">
+                        <option value="0">0% — Esente IVA</option>
+                        <option value="4">4% — Beni prima necessità</option>
+                        <option value="5">5%</option>
+                        <option value="10">10% — Ridotta</option>
+                        <option value="22">22% — Ordinaria</option>
+                    </select>
+                </div>
+            </div>
+            <div class="fr c2">
+                <div class="fg">
+                    <label class="fl">Veicolo *</label>
+                    <select class="fc" @bind="_f.TargaVeicolo">
+                        <option value="">— Seleziona veicolo —</option>
+                        @foreach (var v in _veicoli)
+                        {
+                            <option value="@v.Targa">@v.Targa — @v.Marca @v.Modello (@v.CodiceCliente)</option>
+                        }
+                    </select>
+                </div>
+                <div class="fg">
+                    <label class="fl">Stato</label>
+                    <select class="fc" @bind="_f.Stato">
+                        @foreach (var s in Enum.GetValues<StatoPreventivo>())
+                        {
+                            <option value="@s">@s</option>
+                        }
+                    </select>
+                </div>
+            </div>
+            <div class="fg"><label class="fl">Note</label><textarea class="fc" @bind="_f.Note" rows="2" placeholder="Note aggiuntive…"></textarea></div>
+
+            <div style="margin-bottom:10px">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                    <span class="fl" style="margin:0">Voci</span>
+                    <button class="btn btn-secondary btn-sm" type="button" @onclick="AggiungiVoce"><i class="bi bi-plus"></i> Aggiungi voce</button>
+                </div>
+                @if (_f.Voci.Count == 0)
+                {
+                    <p style="font-size:12px;color:var(--muted);text-align:center;padding:10px 0">Nessuna voce. Clicca "Aggiungi voce" per iniziare.</p>
+                }
+                else
+                {
+                    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);display:grid;grid-template-columns:1fr 80px 100px 80px 28px;gap:6px;margin-bottom:4px;padding:0 2px">
+                        <span>Descrizione</span><span>Qtà</span><span>Prezzo unit.</span><span style="text-align:right">Totale</span><span></span>
+                    </div>
+                    @foreach (var v in _f.Voci)
+                    {
+                        <div style="display:grid;grid-template-columns:1fr 80px 100px 80px 28px;gap:6px;margin-bottom:6px;align-items:center">
+                            <input class="fc" @bind="v.Descrizione" placeholder="Es. Cambio olio" />
+                            <input class="fc" @bind="v.Quantita" type="number" min="0.01" step="0.01" />
+                            <input class="fc" @bind="v.PrezzoUnitario" type="number" min="0" step="0.01" />
+                            <span style="text-align:right;font-weight:500;font-size:13px">€ @v.Totale.ToString("N2")</span>
+                            <button type="button" class="btn btn-danger btn-sm" style="padding:4px 7px" @onclick="() => RimuoviVoce(v)"><i class="bi bi-x"></i></button>
+                        </div>
+                    }
+                    <div style="text-align:right;font-size:13px;padding-top:6px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:3px">
+                        <span>Imponibile: € @_f.Imponibile.ToString("N2")</span>
+                        <span>IVA @_f.AliquotaIva%: € @_f.ImportoIva.ToString("N2")</span>
+                        <span style="font-weight:700;font-size:14px;margin-top:2px">Totale: € @_f.Totale.ToString("N2")</span>
+                    </div>
+                }
+            </div>
+
+            @if (_erroreModale is not null)
+            {
+                <div class="alert alert-danger">@_erroreModale</div>
+            }
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="Chiudi">Annulla</button>
+                <button class="btn btn-primary" @onclick="Salva">Salva</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_confermaElimina)
+{
+    <div class="modal-backdrop">
+        <div class="modal">
+            <div class="modal-title">Elimina preventivo</div>
+            <p>Sei sicuro di voler eliminare il preventivo <strong>@_f.Codice</strong>?</p>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="Chiudi">Annulla</button>
+                <button class="btn btn-danger" @onclick="Elimina">Elimina</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_confermaConverti)
+{
+    <div class="modal-backdrop">
+        <div class="modal">
+            <div class="modal-title">Converti in fattura</div>
+            <p>Vuoi creare una fattura dal preventivo <strong>@_f.Codice</strong>?</p>
+            <p style="font-size:12px;color:var(--muted);margin-top:6px">Le voci verranno copiate. Il preventivo rimarrà invariato.</p>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="Chiudi">Annulla</button>
+                <button class="btn btn-primary" @onclick="Converti"><i class="bi bi-receipt"></i> Crea fattura</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    List<PreventivoDto> _lista = new();
+    List<VeicoloDto> _veicoli = new();
+    PreventivoDto _f = new();
+    string _q = "", _filtroStato = "";
+    bool _modale, _isModifica, _confermaElimina, _confermaConverti;
+    string? _errore, _erroreModale, _successo;
+
+    // filtro per testo e stato
+    IEnumerable<PreventivoDto> _filtrati
+    {
+        get
+        {
+            var r = _lista.AsEnumerable();
+            if (!string.IsNullOrWhiteSpace(_q))
+                r = r.Where(p => p.Codice.Contains(_q, StringComparison.OrdinalIgnoreCase) ||
+                                 p.TargaVeicolo.Contains(_q, StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrWhiteSpace(_filtroStato) && Enum.TryParse<StatoPreventivo>(_filtroStato, out var stato))
+                r = r.Where(p => p.Stato == stato);
+            return r;
+        }
+    }
+
+    protected override Task OnInitializedAsync() => Carica();
+
+    async Task Carica()
+    {
+        try
+        {
+            _lista = await Api.GetPreventiviAsync();
+            _veicoli = await Api.GetVeicoliAsync();
+            _errore = null;
+        }
+        catch (Exception ex) { _errore = ex.Message; }
+    }
+
+    void ApriNuovo()
+    {
+        _f = new() { Data = DateTime.Today, Stato = StatoPreventivo.Bozza };
+        _isModifica = false; _erroreModale = null; _modale = true; _successo = null;
+    }
+
+    // copio il preventivo per non modificare direttamente la lista
+    void ApriModifica(PreventivoDto p)
+    {
+        _f = new()
+        {
+            Codice = p.Codice,
+            Data = p.Data,
+            ValidoFino = p.ValidoFino,
+            Note = p.Note,
+            Stato = p.Stato,
+            AliquotaIva = p.AliquotaIva,
+            TargaVeicolo = p.TargaVeicolo,
+            Voci = p.Voci.Select(v => new VocePreventivoDto
+            {
+                VocePreventivoId = v.VocePreventivoId,
+                Descrizione = v.Descrizione,
+                Quantita = v.Quantita,
+                PrezzoUnitario = v.PrezzoUnitario
+            }).ToList()
+        };
+        _isModifica = true; _erroreModale = null; _modale = true; _successo = null;
+    }
+
+    void ApriElimina(PreventivoDto p) { _f = p; _confermaElimina = true; _successo = null; }
+    void ApriConverti(PreventivoDto p) { _f = p; _confermaConverti = true; _successo = null; }
+
+    void Chiudi() { _modale = false; _confermaElimina = false; _confermaConverti = false; _erroreModale = null; }
+
+    void AggiungiVoce() => _f.Voci.Add(new VocePreventivoDto { Quantita = 1 });
+    void RimuoviVoce(VocePreventivoDto v) => _f.Voci.Remove(v);
+
+    async Task Salva()
+    {
+        if (string.IsNullOrWhiteSpace(_f.TargaVeicolo))
+        { _erroreModale = "Il veicolo è obbligatorio."; return; }
+        if (_f.Voci.Any(v => string.IsNullOrWhiteSpace(v.Descrizione)))
+        { _erroreModale = "Tutte le voci devono avere una descrizione."; return; }
+
+        bool ok = _isModifica
+            ? await Api.AggiornaPreventivoAsync(_f)
+            : await Api.InserisciPreventivoAsync(_f);
+        if (!ok) { _erroreModale = _isModifica ? "Aggiornamento non riuscito." : "Inserimento non riuscito."; return; }
+        Chiudi(); await Carica();
+    }
+
+    async Task Elimina()
+    {
+        bool ok = await Api.EliminaPreventivoAsync(_f.Codice);
+        if (!ok) _errore = "Eliminazione non riuscita.";
+        _confermaElimina = false; await Carica();
+    }
+
+    // chiamo l'endpoint dedicato per creare la fattura dal preventivo
+    async Task Converti()
+    {
+        FatturaDto? fattura = await Api.ConvertiFatturaAsync(_f.Codice);
+        _confermaConverti = false;
+        if (fattura is null) { _errore = "Conversione non riuscita."; return; }
+        _successo = $"Fattura {fattura.Codice} creata con successo.";
+        await Carica();
+    }
+
+    // classe del badge in base allo stato preventivo
+    string BadgeClassPrev(StatoPreventivo s) => s switch
+    {
+        StatoPreventivo.Bozza => "badge-bozza",
+        StatoPreventivo.Inviato => "badge-inviato",
+        StatoPreventivo.Accettato => "badge-completato",
+        StatoPreventivo.Rifiutato => "badge-annullato",
+        StatoPreventivo.Scaduto => "badge-scaduto",
+        _ => ""
+    };
+}

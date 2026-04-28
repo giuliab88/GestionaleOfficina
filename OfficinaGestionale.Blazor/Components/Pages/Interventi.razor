@@ -1,0 +1,189 @@
+@page "/interventi"
+@attribute [Authorize]
+@inject ApiClient Api
+
+@if (_errore is not null)
+{
+    <div class="alert alert-danger">@_errore</div>
+}
+
+<div class="card">
+    <div class="card-head">
+        <span class="card-title">Interventi (@_filtrati.Count())</span>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <div class="search"><input class="fc" placeholder="Cerca…" @bind="_q" @bind:event="oninput" /></div>
+            <select class="fc" style="width:auto" @bind="_filtroStato">
+                <option value="">Tutti gli stati</option>
+                @foreach (var s in Enum.GetValues<StatoIntervento>())
+                {
+                    <option value="@s">@s</option>
+                }
+            </select>
+            <button class="btn btn-primary btn-sm" @onclick="ApriNuovo">+ Nuovo intervento</button>
+        </div>
+    </div>
+    <div class="tw">
+        <table>
+            <thead>
+                <tr><th>Codice</th><th>Veicolo</th><th>Cliente</th><th>Data</th><th>Prezzo</th><th>Stato</th><th>Descrizione</th><th></th></tr>
+            </thead>
+            <tbody>
+                @if (!_filtrati.Any())
+                {
+                    <tr><td colspan="8"><div class="empty-state"><div class="empty-icon"><i class="bi bi-wrench"></i></div><p>Nessun intervento trovato.</p></div></td></tr>
+                }
+                else
+                {
+                    @foreach (var i in _filtrati)
+                    {
+                        <tr>
+                            <td class="td-code">@i.Codice</td>
+                            <td>@(i.Veicolo is not null ? $"{i.Veicolo.Marca} {i.Veicolo.Modello} ({i.Veicolo.Targa})" : i.TargaVeicolo)</td>
+                            <td class="td-m">@(i.Veicolo?.CodiceCliente ?? "—")</td>
+                            <td class="td-m">@i.DataIngresso.ToShortDateString()</td>
+                            <td style="font-weight:500">€ @i.Prezzo.ToString("N2")</td>
+                            <td><span class="badge @BadgeClass(i.Stato)">@i.Stato</span></td>
+                            <td class="td-m" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">@(i.Descrizione ?? "—")</td>
+                            <td>
+                                <div class="td-act">
+                                    <button class="btn btn-secondary btn-sm" @onclick="() => ApriModifica(i)"><i class="bi bi-pencil"></i> Modifica</button>
+                                    <button class="btn btn-danger btn-sm" @onclick="() => ApriElimina(i)"><i class="bi bi-trash"></i> Elimina</button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@if (_modale)
+{
+    <div class="modal-backdrop">
+        <div class="modal">
+            <div class="modal-title">@(_isModifica ? $"Modifica — {_f.Codice}" : "Nuovo intervento")</div>
+            <div class="fg"><label class="fl">Codice intervento</label><input class="fc" @bind="_f.Codice" disabled="@_isModifica" placeholder="Lascia vuoto per generarlo" /></div>
+            <div class="fg">
+                <label class="fl">Veicolo *</label>
+                <select class="fc" @bind="_f.TargaVeicolo">
+                    <option value="">— Seleziona veicolo —</option>
+                    @foreach (var v in _veicoli)
+                    {
+                        <option value="@v.Targa">@v.Targa — @v.Marca @v.Modello (@v.CodiceCliente)</option>
+                    }
+                </select>
+            </div>
+            <div class="fr c2">
+                <div class="fg"><label class="fl">Prezzo (€)</label><input class="fc" @bind="_f.Prezzo" type="number" min="0" step="0.01" /></div>
+                <div class="fg">
+                    <label class="fl">Stato</label>
+                    <select class="fc" @bind="_f.Stato">
+                        @foreach (var s in Enum.GetValues<StatoIntervento>())
+                        {
+                            <option value="@s">@s</option>
+                        }
+                    </select>
+                </div>
+            </div>
+            <div class="fg"><label class="fl">Data ingresso</label><input class="fc" @bind="_f.DataIngresso" type="date" /></div>
+            <div class="fg"><label class="fl">Descrizione</label><textarea class="fc" @bind="_f.Descrizione" rows="3" placeholder="Es. Cambio olio + filtro aria…"></textarea></div>
+            @if (_erroreModale is not null)
+            {
+                <div class="alert alert-danger">@_erroreModale</div>
+            }
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="Chiudi">Annulla</button>
+                <button class="btn btn-primary" @onclick="Salva">Salva</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_confermaElimina)
+{
+    <div class="modal-backdrop">
+        <div class="modal">
+            <div class="modal-title">Elimina intervento</div>
+            <p>Sei sicuro di voler eliminare l'intervento <strong>@_f.Codice</strong>?</p>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="Chiudi">Annulla</button>
+                <button class="btn btn-danger" @onclick="Elimina">Elimina</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    List<InterventoDto> _lista = new();
+    List<VeicoloDto> _veicoli = new();
+    InterventoDto _f = new();
+    string _q = "", _filtroStato = "";
+    bool _modale, _isModifica, _confermaElimina;
+    string? _errore, _erroreModale;
+
+    // filtro per testo e stato
+    IEnumerable<InterventoDto> _filtrati
+    {
+        get
+        {
+            var r = _lista.AsEnumerable();
+            if (!string.IsNullOrWhiteSpace(_q))
+                r = r.Where(i => i.Codice.Contains(_q, StringComparison.OrdinalIgnoreCase) ||
+                                 i.TargaVeicolo.Contains(_q, StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrWhiteSpace(_filtroStato) && Enum.TryParse<StatoIntervento>(_filtroStato, out var stato))
+                r = r.Where(i => i.Stato == stato);
+            return r;
+        }
+    }
+
+    protected override Task OnInitializedAsync() => Carica();
+
+    async Task Carica()
+    {
+        try
+        {
+            _lista = await Api.GetInterventiAsync();
+            _veicoli = await Api.GetVeicoliAsync();
+            _errore = null;
+        }
+        catch (Exception ex) { _errore = ex.Message; }
+    }
+
+    void ApriNuovo() { _f = new() { DataIngresso = DateTime.Today, Stato = StatoIntervento.Aperto }; _isModifica = false; _erroreModale = null; _modale = true; }
+
+    // copio l'intervento per non modificare direttamente la lista
+    void ApriModifica(InterventoDto i) { _f = new() { Codice = i.Codice, TargaVeicolo = i.TargaVeicolo, Descrizione = i.Descrizione, Prezzo = i.Prezzo, Stato = i.Stato, DataIngresso = i.DataIngresso }; _isModifica = true; _erroreModale = null; _modale = true; }
+
+    void ApriElimina(InterventoDto i) { _f = i; _confermaElimina = true; }
+    void Chiudi() { _modale = false; _confermaElimina = false; _erroreModale = null; }
+
+    async Task Salva()
+    {
+        if (string.IsNullOrWhiteSpace(_f.TargaVeicolo))
+        { _erroreModale = "Il veicolo è obbligatorio."; return; }
+
+        bool ok = _isModifica
+            ? await Api.AggiornaInterventoAsync(_f)
+            : await Api.InserisciInterventoAsync(_f);
+        if (!ok) { _erroreModale = _isModifica ? "Aggiornamento non riuscito." : "Inserimento non riuscito."; return; }
+        Chiudi(); await Carica();
+    }
+
+    async Task Elimina()
+    {
+        bool ok = await Api.EliminaInterventoAsync(_f.Codice);
+        if (!ok) _errore = "Eliminazione non riuscita.";
+        _confermaElimina = false; await Carica();
+    }
+
+    // classe del badge in base allo stato intervento
+    string BadgeClass(StatoIntervento s) => s switch
+    {
+        StatoIntervento.Aperto => "badge-aperto",
+        StatoIntervento.InLavorazione => "badge-lavorazione",
+        StatoIntervento.Completato => "badge-completato",
+        StatoIntervento.Annullato => "badge-annullato",
+        _ => ""
+    };
+}

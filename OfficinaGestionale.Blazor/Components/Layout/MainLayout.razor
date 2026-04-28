@@ -1,0 +1,96 @@
+@inherits LayoutComponentBase
+@inject NavigationManager Nav
+@inject JwtTokenService JwtTokenService
+@attribute [Authorize]
+
+<div class="shell">
+    <header class="topbar">
+        <div class="topbar-brand">
+            <span class="brand-text">Officina <span>Urbana</span></span>
+        </div>
+        <span class="topbar-title">@_titolo</span>
+    </header>
+    <div class="layout-body">
+        <aside class="sidebar">
+            <nav class="sb-nav">
+                <div class="sb-label">Menu</div>
+                <NavLink class="sb-link" href="/" Match="NavLinkMatch.All">
+                    <i class="bi bi-speedometer2 sb-icon icon-orange"></i>
+                    <span class="sb-link-text">Dashboard</span>
+                </NavLink>
+                <NavLink class="sb-link" href="/clienti">
+                    <i class="bi bi-people-fill sb-icon icon-blue"></i>
+                    <span class="sb-link-text">Clienti</span>
+                </NavLink>
+                <NavLink class="sb-link" href="/veicoli">
+                    <i class="bi bi-car-front-fill sb-icon icon-green"></i>
+                    <span class="sb-link-text">Veicoli</span>
+                </NavLink>
+                <NavLink class="sb-link" href="/interventi">
+                    <i class="bi bi-wrench-adjustable sb-icon icon-purple"></i>
+                    <span class="sb-link-text">Interventi</span>
+                </NavLink>
+                <NavLink class="sb-link" href="/preventivi">
+                    <i class="bi bi-file-earmark-text sb-icon icon-yellow"></i>
+                    <span class="sb-link-text">Preventivi</span>
+                </NavLink>
+                <NavLink class="sb-link" href="/fatture">
+                    <i class="bi bi-receipt sb-icon icon-teal"></i>
+                    <span class="sb-link-text">Fatture</span>
+                </NavLink>
+            </nav>
+            <div class="sb-foot">
+                <div class="sb-user">
+                    <div class="sb-avatar">@_iniziale</div>
+                    <div class="sb-user-info">
+                        <div class="sb-uname">@_nome</div>
+                        <div class="sb-urole">@_ruolo</div>
+                    </div>
+                </div>
+                <form method="post" action="/account/logout" style="margin:0">
+                    <button type="submit" class="btn-logout">
+                        <i class="bi bi-box-arrow-left"></i>
+                        <span class="sb-link-text">Esci dall'account</span>
+                    </button>
+                </form>
+            </div>
+        </aside>
+        <div class="main">
+            <main class="content">
+                <div class="content-inner">@Body</div>
+            </main>
+        </div>
+    </div>
+</div>
+
+@code {
+    string _titolo = "", _nome = "", _ruolo = "", _iniziale = "?";
+
+    [CascadingParameter]
+    Task<AuthenticationState>? AuthStateTask { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthStateTask != null)
+        {
+            // recupero i dati utente salvati nei claim
+            AuthenticationState auth = await AuthStateTask;
+            _nome = auth.User.Identity?.Name ?? "";
+            _iniziale = _nome.Length > 0 ? _nome[0].ToString().ToUpper() : "?";
+            _ruolo = auth.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "";
+            JwtTokenService.Token = auth.User.FindFirstValue("jwt");
+        }
+        AggiornaTitolo(Nav.Uri);
+        Nav.LocationChanged += (_, e) => { AggiornaTitolo(e.Location); StateHasChanged(); };
+    }
+    // aggiorno il titolo in base alla pagina corrente
+    void AggiornaTitolo(string uri)
+    {
+        if      (uri.Contains("/clienti"))    _titolo = "Clienti";
+        else if (uri.Contains("/veicoli"))    _titolo = "Veicoli";
+        else if (uri.Contains("/interventi")) _titolo = "Interventi";
+        else if (uri.Contains("/preventivi")) _titolo = "Preventivi";
+        else if (uri.Contains("/fatture"))    _titolo = "Fatture";
+        else                                  _titolo = "Dashboard";
+    }
+}

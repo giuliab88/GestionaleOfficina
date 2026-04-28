@@ -1,0 +1,159 @@
+@page "/veicoli"
+@attribute [Authorize]
+@inject ApiClient Api
+
+@if (_errore is not null)
+{
+    <div class="alert alert-danger">@_errore</div>
+}
+
+<div class="card">
+    <div class="card-head">
+        <span class="card-title">Veicoli (@_filtrati.Count())</span>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <div class="search"><input class="fc" placeholder="Cerca…" @bind="_q" @bind:event="oninput" /></div>
+            <button class="btn btn-primary btn-sm" @onclick="ApriNuovo">+ Nuovo veicolo</button>
+        </div>
+    </div>
+    <div class="tw">
+        <table>
+            <thead>
+                <tr><th>Codice</th><th>Targa</th><th>Marca</th><th>Modello</th><th>Anno</th><th>Cliente</th><th></th></tr>
+            </thead>
+            <tbody>
+                @if (!_filtrati.Any())
+                {
+                    <tr><td colspan="7"><div class="empty-state"><div class="empty-icon"><i class="bi bi-car-front"></i></div><p>Nessun veicolo trovato.</p></div></td></tr>
+                }
+                else
+                {
+                    @foreach (var v in _filtrati)
+                    {
+                        <tr>
+                            <td class="td-code">@v.Codice</td>
+                            <td><strong>@v.Targa</strong></td>
+                            <td>@v.Marca</td>
+                            <td>@v.Modello</td>
+                            <td class="td-m">@v.Anno</td>
+                            <td class="td-m">@v.CodiceCliente</td>
+                            <td>
+                                <div class="td-act">
+                                    <button class="btn btn-secondary btn-sm" @onclick="() => ApriModifica(v)"><i class="bi bi-pencil"></i> Modifica</button>
+                                    <button class="btn btn-danger btn-sm" @onclick="() => ApriElimina(v)"><i class="bi bi-trash"></i> Elimina</button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@if (_modale)
+{
+    <div class="modal-backdrop">
+        <div class="modal">
+            <div class="modal-title">@(_isModifica ? $"Modifica — {_f.Targa}" : "Nuovo veicolo")</div>
+            <div class="fg"><label class="fl">Targa *</label><input class="fc" @bind="_f.Targa" placeholder="Es. AB123CD" /></div>
+            <div class="fr c2">
+                <div class="fg"><label class="fl">Marca *</label><input class="fc" @bind="_f.Marca" /></div>
+                <div class="fg"><label class="fl">Modello *</label><input class="fc" @bind="_f.Modello" /></div>
+            </div>
+            <div class="fr c2">
+                <div class="fg"><label class="fl">Anno</label><input class="fc" @bind="_f.Anno" type="number" min="1900" max="2100" /></div>
+                <div class="fg">
+                    <label class="fl">Cliente *</label>
+                    <select class="fc" @bind="_f.CodiceCliente">
+                        <option value="">— Seleziona cliente —</option>
+                        @foreach (var c in _clienti)
+                        {
+                            <option value="@c.Codice">@c.Cognome @c.Nome (@c.Codice)</option>
+                        }
+                    </select>
+                </div>
+            </div>
+            @if (_erroreModale is not null)
+            {
+                <div class="alert alert-danger">@_erroreModale</div>
+            }
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="Chiudi">Annulla</button>
+                <button class="btn btn-primary" @onclick="Salva">Salva</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_confermaElimina)
+{
+    <div class="modal-backdrop">
+        <div class="modal">
+            <div class="modal-title">Elimina veicolo</div>
+            <p>Sei sicuro di voler eliminare <strong>@_f.Targa — @_f.Marca @_f.Modello</strong>?</p>
+            <p style="color:var(--muted);font-size:12.5px;margin-top:6px">Il veicolo non può essere eliminato se ha interventi collegati.</p>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="Chiudi">Annulla</button>
+                <button class="btn btn-danger" @onclick="Elimina">Elimina</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    List<VeicoloDto> _lista = new();
+    List<ClienteDto> _clienti = new();
+    VeicoloDto _f = new();
+    string _q = "";
+    bool _modale, _isModifica, _confermaElimina;
+    string? _errore, _erroreModale;
+
+    // filtro lato client su targa, modello e cliente
+    IEnumerable<VeicoloDto> _filtrati => string.IsNullOrWhiteSpace(_q) ? _lista
+        : _lista.Where(v =>
+            v.Targa.Contains(_q, StringComparison.OrdinalIgnoreCase) ||
+            v.Marca.Contains(_q, StringComparison.OrdinalIgnoreCase) ||
+            v.Modello.Contains(_q, StringComparison.OrdinalIgnoreCase) ||
+            v.CodiceCliente.Contains(_q, StringComparison.OrdinalIgnoreCase));
+
+    protected override Task OnInitializedAsync() => Carica();
+
+    async Task Carica()
+    {
+        try
+        {
+            _lista = await Api.GetVeicoliAsync();
+            _clienti = await Api.GetClientiAsync();
+            _errore = null;
+        }
+        catch (Exception ex) { _errore = ex.Message; }
+    }
+
+    void ApriNuovo() { _f = new() { Anno = DateTime.Today.Year }; _isModifica = false; _erroreModale = null; _modale = true; }
+
+    // copio il veicolo per non modificare direttamente la lista
+    void ApriModifica(VeicoloDto v) { _f = new() { Codice = v.Codice, Targa = v.Targa, Marca = v.Marca, Modello = v.Modello, Anno = v.Anno, CodiceCliente = v.CodiceCliente }; _isModifica = true; _erroreModale = null; _modale = true; }
+
+    void ApriElimina(VeicoloDto v) { _f = v; _confermaElimina = true; }
+    void Chiudi() { _modale = false; _confermaElimina = false; _erroreModale = null; }
+
+    async Task Salva()
+    {
+        if (string.IsNullOrWhiteSpace(_f.Targa) || string.IsNullOrWhiteSpace(_f.Marca) ||
+            string.IsNullOrWhiteSpace(_f.Modello) || string.IsNullOrWhiteSpace(_f.CodiceCliente))
+        { _erroreModale = "Targa, marca, modello e cliente sono obbligatori."; return; }
+
+        bool ok = _isModifica
+            ? await Api.AggiornaVeicoloAsync(_f)
+            : await Api.InserisciVeicoloAsync(_f);
+        if (!ok) { _erroreModale = _isModifica ? "Aggiornamento non riuscito." : "Targa già registrata."; return; }
+        Chiudi(); await Carica();
+    }
+
+    async Task Elimina()
+    {
+        bool ok = await Api.EliminaVeicoloAsync(_f.Codice);
+        if (!ok) _errore = "Eliminazione non riuscita. Il veicolo ha interventi collegati.";
+        _confermaElimina = false; await Carica();
+    }
+}

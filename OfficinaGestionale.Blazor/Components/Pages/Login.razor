@@ -1,0 +1,46 @@
+@page "/login"
+@layout OfficinaGestionale.Blazor.Components.Layout.EmptyLayout
+@attribute [AllowAnonymous]
+
+<PageTitle>Accedi — Officina Urbana</PageTitle>
+
+<div class="login-wrap">
+    <div class="login-card">
+        <div class="login-logo">
+            <div class="login-logo-name">Officina <span>Urbana</span></div>
+            <div class="login-logo-sub">Gestionale officina</div>
+        </div>
+
+        @if (_errore)
+        {
+            <div class="alert alert-danger">Email o password non validi.</div>
+        }
+
+        <form method="post" action="/account/login">
+
+            <div class="fg">
+                <label class="fl">Email</label>
+                <input type="text" name="email" placeholder="Email" autocomplete="off" />
+            </div>
+            <div class="fg">
+                <label class="fl">Password</label>
+                <div class="pwd-wrap">
+                    <input type="@(_mostraPassword ? "text" : "password")" name="password" placeholder="Password" autocomplete="new-password" />
+                    <button type="button" class="pwd-toggle" @onclick="() => _mostraPassword = !_mostraPassword">
+                        <i class="bi @(_mostraPassword ? "bi-eye-slash" : "bi-eye")"></i>
+                    </button>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-full" style="margin-top:6px">Accedi</button>
+        </form>
+    </div>
+</div>
+
+@code {
+    // arriva dalla query dopo un login fallito
+    [SupplyParameterFromQuery(Name = "errore")]
+    string? _erroreParam { get; set; }
+
+    bool _errore => _erroreParam == "1";
+    bool _mostraPassword = false;
+}
